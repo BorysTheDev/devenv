@@ -30,7 +30,8 @@ run() {
            "${HOME}/remote/.local/share" \
            "${HOME}/remote/.claude" \
            "${HOME}/remote/.copilot" \
-           "${HOME}/remote/.codex"
+           "${HOME}/remote/.codex" \
+           "${HOME}/remote/.npm-global"
 
   # Run the Docker container with the specified configurations
   docker run --user builder "$@" \
@@ -43,6 +44,7 @@ run() {
     --mount type=bind,source="${HOME}/remote/.claude",destination="/home/builder/.claude" \
     --mount type=bind,source="${HOME}/remote/.copilot",destination="/home/builder/.copilot" \
     --mount type=bind,source="${HOME}/remote/.codex",destination="/home/builder/.codex" \
+    --mount type=bind,source="${HOME}/remote/.npm-global",destination="/home/builder/.npm-global" \
     --mount type=bind,source="${HOME}/.ssh",destination="/home/builder/.ssh",readonly \
     --mount type=bind,source="${HOME}/.gitconfig",destination="/home/builder/.gitconfig",readonly \
     --mount type=bind,source="${HOME}/.gitignore_global",destination="/home/builder/.gitignore_global",readonly \

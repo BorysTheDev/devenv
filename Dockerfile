@@ -29,6 +29,7 @@ RUN apt -y install \
     autoconf \
     autoconf-archive \
     automake \
+    bat \
     bison \
     bsdmainutils \
     build-essential \
@@ -38,6 +39,7 @@ RUN apt -y install \
     clangd \
     cmake \
     curl \
+    fd-find \
     gdb \
     gh \
     git \
@@ -72,6 +74,7 @@ RUN apt -y install \
     pciutils \
     pkg-config \
     redis-tools \
+    ripgrep \
     software-properties-common \
     sudo \
     telnet \
@@ -97,9 +100,6 @@ RUN apt-get install -y nodejs
 
 # Install GitHub Copilot CLI
 RUN npm install -g @github/copilot
-
-# Install OpenAI Codex CLI
-RUN npm install -g @openai/codex
 
 # Install Tree-sitter CLI
 RUN npm install -g tree-sitter-cli
@@ -174,11 +174,13 @@ RUN usermod -aG docker builder
 RUN mkdir -p /etc/docker && \
     echo '{\n  "live-restore": true,\n  "group": "docker"\n}' > /etc/docker/daemon.json
 
+# Debian/Ubuntu ship these under different binary names to avoid clashes.
+RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
+    ln -sf /usr/bin/batcat /usr/local/bin/bat
+
 # Install Rust and Cargo for builder user
 USER builder
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && \
-    . "$HOME/.cargo/env" && \
-    cargo install fd-find eza ripgrep bat
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 RUN python3.10 -m venv /home/builder/.venv
 
@@ -201,10 +203,15 @@ USER root
 # Bumped by `update`/update.sh via --build-arg CACHE_BUST=<ts> to re-run only the
 # steps below and refresh the CLI, while every heavy layer above stays cached.
 ARG CACHE_BUST=none
-RUN npm update -g @github/copilot @openai/codex tree-sitter-cli
+RUN npm update -g @github/copilot tree-sitter-cli
 
 COPY zshrc /home/builder/.zshrc
 
 COPY colorize_script.py /home/builder/.colorize_script.py
+
+# Codex CLI lives in a bind-mounted npm prefix (see run.sh) so it can be
+# upgraded from inside the container without rebuilding the image.
+ENV NPM_CONFIG_PREFIX=/home/builder/.npm-global
+ENV PATH=/home/builder/.npm-global/bin:$PATH
 
 WORKDIR /home/builder

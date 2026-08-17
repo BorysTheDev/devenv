@@ -16,8 +16,10 @@ docker build --platform linux/arm64 --build-arg UID=$(id -u) -t builder .
 The container installs:
 
 - `@github/copilot`
-- `@openai/codex`
 - `tree-sitter`
+
+`@openai/codex` is installed on first shell start into `~/.npm-global`, which is
+bind-mounted from the host, so `codex-update` upgrades it without rebuilding the image.
 
 Tree-sitter grammars are preinstalled for:
 

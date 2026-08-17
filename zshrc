@@ -42,13 +42,22 @@ export PATH=/usr/local/go/pkg/tool/linux_amd64/:${PATH}
 # claude
 export PATH=${HOME}/.claude/local/:${PATH}
 
+# npm globals installed here survive container recreation (host bind mount)
+export NPM_CONFIG_PREFIX=${HOME}/.npm-global
+export PATH=${NPM_CONFIG_PREFIX}/bin:${PATH}
+
+alias codex-update='npm install -g @openai/codex@latest'
+
+if [ ! -x "${NPM_CONFIG_PREFIX}/bin/codex" ]; then
+    echo "Installing @openai/codex into ${NPM_CONFIG_PREFIX}..."
+    npm install -g @openai/codex
+fi
+
 # Docker settings
 export DOCKER_HOST=unix:///var/run/docker.sock
 
 # Activate Python virtual environment
 source ${HOME}/.venv/bin/activate
-
-alias ls="eza"
 
 function colorize() {
     if [ "$1" = "cut" ]; then
