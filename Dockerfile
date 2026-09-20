@@ -34,15 +34,20 @@ RUN apt -y install \
     bsdmainutils \
     build-essential \
     ca-certificates \
+    cargo \
     ccache \
     clang-18 \
     clangd \
     cmake \
     curl \
+    docker-buildx \
+    docker-compose-v2 \
+    docker.io \
     fd-find \
     gdb \
     gh \
     git \
+    golang-go \
     graphviz \
     htop \
     iproute2 \
@@ -75,6 +80,7 @@ RUN apt -y install \
     pkg-config \
     redis-tools \
     ripgrep \
+    rustc \
     software-properties-common \
     sudo \
     telnet \
@@ -83,9 +89,7 @@ RUN apt -y install \
     unzip \
     valgrind \
     vim \
-    wget \
-    zlib1g-dev \
-    zsh
+    zlib1g-dev
 
 #RUN apt -y install \
 #    gcc-14 \
@@ -100,6 +104,9 @@ RUN apt-get install -y nodejs
 
 # Install GitHub Copilot CLI
 RUN npm install -g @github/copilot
+
+# Install OpenAI Codex CLI
+RUN npm install -g @openai/codex
 
 # Install Tree-sitter CLI
 RUN npm install -g tree-sitter-cli
@@ -121,33 +128,16 @@ RUN curl -fsSL https://packages.redis.io/gpg | gpg --dearmor -o /usr/share/keyri
     apt-get update --fix-missing && \
     apt-get install -y memtier-benchmark
 
-# Add Docker repository and install Docker
-RUN curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu jammy stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null && \
-    apt-get update --fix-missing && \
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
 # Build AFL++ from source with AFL_PERSISTENT_RECORD support
-RUN git clone --depth=1 --branch v4.34c https://github.com/AFLplusplus/AFLplusplus.git /opt/AFLplusplus && \
-    cd /opt/AFLplusplus && \
-    sed -i 's|// #define AFL_PERSISTENT_RECORD|#define AFL_PERSISTENT_RECORD|' include/config.h && \
-    make distrib && \
-    make install && \
-    cd / && rm -rf /opt/AFLplusplus
+# RUN git clone --depth=1 --branch v4.34c https://github.com/AFLplusplus/AFLplusplus.git /opt/AFLplusplus && \
+#     cd /opt/AFLplusplus && \
+#     sed -i 's|// #define AFL_PERSISTENT_RECORD|#define AFL_PERSISTENT_RECORD|' include/config.h && \
+#     make distrib && \
+#     make install && \
+#     cd / && rm -rf /opt/AFLplusplus
 
-# Install Go 1.24.1
-RUN ARCH=$(uname -m) && \
-    case "$ARCH" in \
-      x86_64)  GOARCH=amd64 ;; \
-      aarch64) GOARCH=arm64 ;; \
-      *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-    esac && \
-    wget https://go.dev/dl/go1.24.1.linux-${GOARCH}.tar.gz && \
-    rm -rf /usr/local/go && \
-    tar -C /usr/local -xzf go1.24.1.linux-${GOARCH}.tar.gz && \
-    rm go1.24.1.linux-${GOARCH}.tar.gz
-
-ENV PATH=$PATH:/usr/local/go/bin
+# Go comes from the Ubuntu repository (golang-go, installed above); its
+# binaries are already on PATH via /usr/bin, so only GOPATH needs wiring up.
 ENV GOPATH=/home/builder/go
 ENV PATH=$PATH:$GOPATH/bin
 
@@ -160,9 +150,9 @@ RUN existing_user=$(getent passwd $LOCAL_UID | cut -d: -f1) && \
         if ! getent group $LOCAL_GID > /dev/null; then \
             addgroup --gid $LOCAL_GID g${LOCAL_GID}; \
         fi; \
-        adduser --uid $LOCAL_UID --gid $LOCAL_GID --gecos "" --disabled-password --home /home/builder --shell /usr/bin/zsh builder; \
+        adduser --uid $LOCAL_UID --gid $LOCAL_GID --gecos "" --disabled-password --home /home/builder builder; \
     else \
-        adduser --uid $LOCAL_UID --gecos "" --disabled-password --home /home/builder --shell /usr/bin/zsh builder; \
+        adduser --uid $LOCAL_UID --gecos "" --disabled-password --home /home/builder builder; \
     fi
 
 RUN usermod -aG sudo builder && echo "builder ALL=(ALL) NOPASSWD: ALL" | tee /etc/sudoers.d/builder
@@ -178,17 +168,12 @@ RUN mkdir -p /etc/docker && \
 RUN ln -sf /usr/bin/fdfind /usr/local/bin/fd && \
     ln -sf /usr/bin/batcat /usr/local/bin/bat
 
-# Install Rust and Cargo for builder user
+# Rust and Cargo come from the Ubuntu repository (rustc/cargo, installed above).
 USER builder
-RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 
 RUN python3.10 -m venv /home/builder/.venv
 
-RUN sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-RUN git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting
-RUN git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions
-
-RUN git clone https://github.com/dragonflydb/df-afl.git /home/builder/df-afl
+# RUN git clone https://github.com/dragonflydb/df-afl.git /home/builder/df-afl
 
 # Install Tree-sitter grammars for C++, Python, and Go.
 RUN mkdir -p /home/builder/.tree-sitter/parsers && \
@@ -201,16 +186,12 @@ RUN mkdir -p /home/builder/.tree-sitter/parsers && \
 USER root
 
 # Bumped by `update`/update.sh via --build-arg CACHE_BUST=<ts> to re-run only the
-# steps below and refresh the CLI, while every heavy layer above stays cached.
+# steps below and refresh the CLIs, while every heavy layer above stays cached.
 ARG CACHE_BUST=none
-RUN npm update -g @github/copilot tree-sitter-cli
+RUN npm update -g @github/copilot @openai/codex tree-sitter-cli
 
-COPY zshrc /home/builder/.zshrc
-
-COPY colorize_script.py /home/builder/.colorize_script.py
-
-# Codex CLI lives in a bind-mounted npm prefix (see run.sh) so it can be
-# upgraded from inside the container without rebuilding the image.
+# npm globals live in a bind-mounted prefix (see run.sh) so anything installed
+# from inside the container survives container recreation.
 ENV NPM_CONFIG_PREFIX=/home/builder/.npm-global
 ENV PATH=/home/builder/.npm-global/bin:$PATH
 

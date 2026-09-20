@@ -33,6 +33,10 @@ run() {
            "${HOME}/remote/.codex" \
            "${HOME}/remote/.npm-global"
 
+  # Single-file mounts need the same treatment: a missing source makes Docker
+  # create a root-owned *directory* at that path, which then breaks git.
+  [ -e "${HOME}/.gitignore_global" ] || touch "${HOME}/.gitignore_global"
+
   # Run the Docker container with the specified configurations
   docker run --user builder "$@" \
     --mount type=bind,source="${project_dir}",destination="/home/builder/${image_name}" \
@@ -50,7 +54,7 @@ run() {
     --mount type=bind,source="${HOME}/.gitignore_global",destination="/home/builder/.gitignore_global",readonly \
     -v /var/run/docker.sock:/var/run/docker.sock \
     --privileged \
-    -it --name "${container_name}" "${image_name}" /usr/bin/zsh
+    -it --name "${container_name}" "${image_name}"
 }
 restart() {
   # Check if the image name is provided
@@ -82,7 +86,7 @@ attach() {
   local image_name="$1"
   local container_name="${image_name}-container"
 
-  docker exec -it "${container_name}" /usr/bin/zsh
+  docker exec -it "${container_name}" /bin/bash
 }
 
 

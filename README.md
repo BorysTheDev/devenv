@@ -16,10 +16,12 @@ docker build --platform linux/arm64 --build-arg UID=$(id -u) -t builder .
 The container installs:
 
 - `@github/copilot`
+- `@openai/codex`
 - `tree-sitter`
 
-`@openai/codex` is installed on first shell start into `~/.npm-global`, which is
-bind-mounted from the host, so `codex-update` upgrades it without rebuilding the image.
+Go and Rust come from the Ubuntu repository (`golang-go`, `rustc`, `cargo`)
+rather than upstream installers, so the build does not depend on
+`go.dev` or `static.rust-lang.org` being reachable.
 
 Tree-sitter grammars are preinstalled for:
 
@@ -27,14 +29,14 @@ Tree-sitter grammars are preinstalled for:
 - Python (`tree-sitter-python`)
 - Go (`tree-sitter-go`)
 
-## How to start zsh inside container:
+## How to start a shell inside container:
 
 First time:
 ``` sh
-docker run --user builder --mount type=bind,source=${HOME}/dragonfly,destination=/home/builder/dragonfly -it --name builder-container builder /usr/bin/zsh
+docker run --user builder --mount type=bind,source=${HOME}/dragonfly,destination=/home/builder/dragonfly -it --name builder-container builder
 ```
 
 Restart:
 ``` sh
-docker stop builder-container && docker rm builder-container && docker run --user builder --mount type=bind,source=${HOME}/dragonfly,destination=/home/builder/dragonfly --mount type=bind,source=${HOME}/.ssh,destination=/home/builder/.ssh,readonly --mount type=bind,source=${HOME}/.gitconfig,destination=/home/builder/.gitconfig,readonly -it --name builder-container builder /usr/bin/zsh
+docker stop builder-container && docker rm builder-container && docker run --user builder --mount type=bind,source=${HOME}/dragonfly,destination=/home/builder/dragonfly --mount type=bind,source=${HOME}/.ssh,destination=/home/builder/.ssh,readonly --mount type=bind,source=${HOME}/.gitconfig,destination=/home/builder/.gitconfig,readonly -it --name builder-container builder
 ```
